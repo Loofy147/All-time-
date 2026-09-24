@@ -291,6 +291,9 @@ export default function ModelLab() {
       getCacheKey(model.id, model.revision, requestedRuntime, actualDtype),
     );
     const started = performance.now();
+    let loadedMs: number | undefined;
+    let generationMs: number | undefined;
+    let fallbackReason: string | undefined;
 
     try {
       let generator: TextGenerator;
