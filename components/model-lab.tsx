@@ -336,7 +336,8 @@ export default function ModelLab() {
 
         <p className="small" style={{ marginTop: 16 }}>
           Revision: {model.revision}. WebGPU uses q4f16; WASM uses q4.
-          Benchmark runs use deterministic decoding (do_sample=false).
+          WebGPU availability is checked with requestAdapter() before enabling
+          the runtime. Benchmark runs use deterministic decoding (do_sample=false).
           The model executes on the client.
         </p>
       </section>
