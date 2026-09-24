@@ -2,78 +2,111 @@
 
 Date: 2026-09-24
 
-## Established
+## Epistemic status
 
-- GitHub repository: `Loofy147/All-time-`
+### Established
+
+- Repository: `Loofy147/All-time-`
 - Default branch: `main`
 - Vercel project: `all-time-`
-- Latest production commit before this measurement-harness change: `d11e29949f4055d9c8855d116444d76859adcd82`
-- Latest verified production deployment at that point: READY
-- Production alias: `https://all-time-ashen.vercel.app`
-- Production HTTP fetch: 200 OK
 - Supabase project: `All-time-`
-- Supabase status: ACTIVE_HEALTHY
+- Supabase status: `ACTIVE_HEALTHY`
+- Supabase application tables: none
 - Supabase security advisor: 0 findings
 - Supabase performance advisor: 0 findings
-- SmolLM2 ONNX revision: verified on Hugging Face
-- Qwen2.5 0.5B ONNX revision: verified on Hugging Face
-- SmolLM2 q4/q4f16 artifacts exist
-- Qwen2.5 q4/q4f16 artifacts exist
+- Hugging Face SmolLM2 ONNX revision exists and its q4/q4f16 artifacts were verified
+- Hugging Face Qwen2.5 0.5B ONNX revision exists and its q4/q4f16 artifacts were verified
+- Browser-side inference has succeeded once on the owner's device/session
+- A Vercel deployment containing the PWA/static-icon architecture reached READY at commit `c3fbff3a0f88c385df04d29cba511ccb529e933a`
 
-## Corrected
+### Experimentally supported
 
-- Vercel build failure on commit `ed09df6…` was reported as `lint_or_type_error`; later code changes produced READY deployments.
-- Next.js path alias was added to TypeScript configuration.
-- Model pipeline typing was simplified after the failed build.
-- Failed model initialization is removed from the in-memory pipeline cache.
-- WebGPU and WASM dtypes are selected separately.
+A user-run browser test on the deployed application produced:
 
-## Experimentally supported
+- model/runtime load: 128333 ms
+- generation: 11288 ms
+- output: 265 chars
 
-### Browser inference
+This supports end-to-end browser execution on that tested environment only. It does not establish general compatibility, performance, or model quality.
 
-A user-run browser test successfully loaded and generated with the production app:
+The application also records successful-run measurements for:
 
-- Model/runtime load: `128333 ms`
-- Generation: `11288 ms`
-- Output: `265 chars`
-
-Interpretation: this establishes at least one successful end-to-end browser inference run on the user's device/session. It does not establish general performance, because hardware, browser version, cache state, prompt, and runtime conditions are not yet controlled.
-
-### Measurement harness
-
-The model lab now records, per successful run:
-
-- model and fixed revision
+- model and pinned revision
 - runtime and dtype
-- cold vs warm cache state
-- model/runtime load time
+- cold/warm cache state
+- load time
 - generation time
-- output character count
+- output size
 
-Benchmark decoding is deterministic (`do_sample=false`) to reduce avoidable output variation across repeated runs.
+Decoding for benchmark runs is deterministic with `do_sample=false`.
 
-## Open
+### Corrected
 
-### Performance
+- Vercel commit `ed09df6…` failed with `lint_or_type_error`; later code restored READY deployments.
+- TypeScript path aliases were configured.
+- Model pipeline typing was simplified.
+- Failed model initialization is removed from the in-memory cache.
+- WebGPU and WASM use separate dtype selections.
+- WebGPU is now checked through `requestAdapter()`, not merely by checking for `navigator.gpu`.
+- PWA icon routes using dynamic `ImageResponse` generation were removed after Vercel reported a `nextjs_docs` build error in that path.
+- PWA icons are now static SVG files.
+- Service worker cache is limited to the application shell and does not intentionally cache model artifacts.
 
-We still need controlled measurements for:
+## Deployment verification
 
-1. cold load vs warm load
-2. WebGPU vs WASM on the same device
-3. SmolLM2 135M vs Qwen2.5 0.5B
-4. repeated generation latency
+### Last known READY deployment
 
-No general performance threshold is assumed yet.
+Commit:
 
-### Capability
+`c3fbff3a0f88c385df04d29cba511ccb529e933a`
 
-No comparative quality evaluation has been established between SmolLM2 135M and Qwen2.5 0.5B.
+State:
 
-### Product behavior
+`READY`
 
-No product-specific data model has been established. Supabase remains intentionally unused by the application until product behavior is defined.
+This deployment contains the PWA manifest, static 192/512 SVG icons, and mobile workspace architecture.
 
-## Evidence policy
+### Current HEAD
 
-Build success is evidence for build correctness only. A successful browser inference is evidence for runtime execution on that tested environment; it is not evidence for general browser compatibility, performance, or model quality.
+Current source includes subsequent cleanup commits after the last READY deployment.
+
+Therefore:
+
+**Current HEAD production state: OPEN**
+
+The correct claim is not "current HEAD is deployed and verified".
+
+## Open claims
+
+### Runtime
+
+- Android-specific WebGPU behavior is not yet controlled or benchmarked.
+- Automated browser benchmark through cloud browser automation was inconclusive.
+- No device-independent performance claim has been established.
+
+### Model capability
+
+- No controlled quality comparison between SmolLM2 135M and Qwen2.5 0.5B has been established.
+- Arabic/English capability has not been evaluated with a fixed test set.
+
+### Product
+
+- No product data schema exists yet.
+- Supabase remains intentionally unused by application logic.
+- No product-specific persistence requirements have been validated.
+
+### Verification infrastructure
+
+- A GitHub Actions build workflow produced no observable workflow runs.
+- It was removed during cleanup rather than being presented as functioning CI.
+
+## Evidence boundaries
+
+- Vercel build success is evidence for build correctness only.
+- HTTP 200 is evidence that the deployed route responds; it is not evidence of client-side inference.
+- One successful browser generation is evidence for that tested environment; it is not a population-level performance claim.
+- Search/research results do not become project facts until they are checked against the relevant repository or experiment.
+
+## Pause condition
+
+This repository is now in a deliberate research pause. No new implementation work should be added until the owner's repository research pass identifies specific transferable mechanisms or contradictions worth testing.
