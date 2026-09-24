@@ -19,6 +19,9 @@ export default function PwaRuntime() {
     );
 
     if ("serviceWorker" in navigator) {
+      const onControllerChange = () => window.location.reload();
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
       void navigator.serviceWorker.register("/sw.js").then((registration) => {
         if (registration.waiting) {
           setUpdateAvailable(true);
@@ -51,6 +54,7 @@ export default function PwaRuntime() {
     window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
+      navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
@@ -63,9 +67,15 @@ export default function PwaRuntime() {
     setInstallEvent(null);
   }
 
-  function update() {
-    navigator.serviceWorker.controller?.postMessage({ type: "SKIP_WAITING" });
-    window.location.reload();
+  async function update() {
+    const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+    if (!registration) return;
+
+    if (!registration.waiting) {
+      await registration.update();
+    }
+
+    registration.waiting?.postMessage({ type: "SKIP_WAITING" });
   }
 
   if (installed) {
