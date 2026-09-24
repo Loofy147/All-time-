@@ -7,8 +7,8 @@ Date: 2026-09-24
 - GitHub repository: `Loofy147/All-time-`
 - Default branch: `main`
 - Vercel project: `all-time-`
-- Latest production commit: `69d7e072b3068d81ab021289090e534130bf2ef5`
-- Latest production deployment: READY
+- Latest production commit before this measurement-harness change: `d11e29949f4055d9c8855d116444d76859adcd82`
+- Latest verified production deployment at that point: READY
 - Production alias: `https://all-time-ashen.vercel.app`
 - Production HTTP fetch: 200 OK
 - Supabase project: `All-time-`
@@ -28,22 +28,52 @@ Date: 2026-09-24
 - Failed model initialization is removed from the in-memory pipeline cache.
 - WebGPU and WASM dtypes are selected separately.
 
-## Open
+## Experimentally supported
 
 ### Browser inference
 
-The production UI is rendered and HTTP-accessible, but end-to-end model execution has not yet been independently reproduced by an automated browser run. One automated interaction attempt timed out during model loading; subsequent interaction attempts were blocked by the browser-session concurrency limit.
+A user-run browser test successfully loaded and generated with the production app:
 
-This is not evidence that inference is broken. It is also not evidence that inference works. Status remains OPEN.
+- Model/runtime load: `128333 ms`
+- Generation: `11288 ms`
+- Output: `265 chars`
+
+Interpretation: this establishes at least one successful end-to-end browser inference run on the user's device/session. It does not establish general performance, because hardware, browser version, cache state, prompt, and runtime conditions are not yet controlled.
+
+### Measurement harness
+
+The model lab now records, per successful run:
+
+- model and fixed revision
+- runtime and dtype
+- cold vs warm cache state
+- model/runtime load time
+- generation time
+- output character count
+
+Benchmark decoding is deterministic (`do_sample=false`) to reduce avoidable output variation across repeated runs.
+
+## Open
 
 ### Performance
 
-No latency, throughput, memory, or first-load measurements have been established on a controlled device.
+We still need controlled measurements for:
+
+1. cold load vs warm load
+2. WebGPU vs WASM on the same device
+3. SmolLM2 135M vs Qwen2.5 0.5B
+4. repeated generation latency
+
+No general performance threshold is assumed yet.
 
 ### Capability
 
 No comparative quality evaluation has been established between SmolLM2 135M and Qwen2.5 0.5B.
 
+### Product behavior
+
+No product-specific data model has been established. Supabase remains intentionally unused by the application until product behavior is defined.
+
 ## Evidence policy
 
-Build success is evidence for build correctness only. It is not evidence for browser inference correctness or model quality.
+Build success is evidence for build correctness only. A successful browser inference is evidence for runtime execution on that tested environment; it is not evidence for general browser compatibility, performance, or model quality.
