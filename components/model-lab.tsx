@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { pipeline } from "@huggingface/transformers";
 import { MODELS, type RuntimeMode } from "@/lib/models";
 
-type TextGenerator = Awaited<ReturnType<typeof pipeline<"text-generation">>>;
+type TextGenerator = (text: string, options?: Record<string, unknown>) => Promise<unknown>;
 
 type MetricState = {
   loadMs?: number;
@@ -38,8 +38,10 @@ function getGenerator(
     },
   } as never);
 
-  generatorCache.set(cacheKey, promise);
-  return promise;
+  const typedPromise = promise as Promise<TextGenerator>;
+  generatorCache.set(cacheKey, typedPromise);
+  void typedPromise.catch(() => generatorCache.delete(cacheKey));
+  return typedPromise;
 }
 
 export default function ModelLab() {
