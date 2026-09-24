@@ -8,9 +8,8 @@ Date: 2026-09-24
 
 - Repository: `Loofy147/All-time-`
 - Default branch: `main`
-- Current main head: `fcad119c5de292faf5a06879ffbe7791786f2eb0`
 - Vercel project: `all-time-`
-- Current production deployment for the current main head: `dpl_HCz6RNLSc9G5HzHpkMAtejrNEPWj`
+- Last independently verified production deployment in this audit: `dpl_HCz6RNLSc9G5HzHpkMAtejrNEPWj`
 - Current production deployment state: `READY`
 - Production root response: HTTP 200
 - Supabase project: `All-time-`
@@ -65,11 +64,11 @@ The current `cacheHit` field is implementation-specific and should not yet be in
 - PWA icon routes using dynamic `ImageResponse` generation were removed after Vercel reported a `nextjs_docs` build error in that path.
 - PWA icons are now static SVG files.
 - Service worker cache is limited to the application shell and does not intentionally cache model artifacts.
-- The previous statement that current HEAD production state was OPEN is superseded by the current Vercel evidence: current HEAD is deployed and READY.
+- The previous statement that production state was OPEN is superseded for commit `fcad119c...`: that commit reached READY production. Subsequent commits in `main` are documentation-only updates and their production deployment state is tracked separately.
 
 ## Deployment verification
 
-### Current production deployment
+### Last independently verified production deployment
 
 Commit:
 
