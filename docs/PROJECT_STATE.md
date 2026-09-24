@@ -75,7 +75,18 @@ Supabase:
 
 ## Current evidence state
 
-### Hardening branch verification
+### Main verification
+
+The hardening baseline was merged into `main` as commit `3a076a8ec0ea048e121e7b29033d2cc8838a3959`.
+
+The main-branch Quality run `36056291780` passed:
+
+- npm lockfile present and consumed by `npm ci`
+- `npm run typecheck` passed
+- `npm run build` passed
+- build provenance artifact generated and uploaded
+
+### Historical hardening branch verification
 
 The branch `hardening/p0-runtime-evidence` contains the P0/P1/P2 baseline changes and passed GitHub Actions Quality run `36056005521` on commit `a12b1b5eab14160fa9d77873fce41a4fb01bba70`.
 
@@ -110,7 +121,6 @@ Implemented source changes on the branch:
 
 ### Open
 
-- hardening branch changes are not merged to `main` yet
 - no enforced branch protection/status-check gate
 - PWA update behavior is not verified on a real installed Android session
 - deterministic acceptance state is not implemented yet
