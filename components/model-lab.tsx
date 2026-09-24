@@ -438,6 +438,7 @@ export default function ModelLab() {
 
   function exportMeasurements() {
     const payload = {
+      schemaVersion: 2,
       exportedAt: new Date().toISOString(),
       app: "All-time",
       model: model.label,
@@ -656,8 +657,11 @@ export default function ModelLab() {
           </div>
         ) : (
           <div className="history-list">
-            {history.map((item) => (
-              <article className="history-item" key={item.id}>
+            {history.map((item, index) => (
+              <article
+                className="history-item"
+                key={item.runId ?? `legacy-${item.id ?? index}`}
+              >
                 <div>
                   <strong>{item.model}</strong>
                   <div className="small">
