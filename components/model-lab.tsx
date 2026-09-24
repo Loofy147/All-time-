@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { pipeline } from "@huggingface/transformers";
-import { MODELS, type RuntimeMode } from "@/lib/models";
+import { MODELS, type ModelDefinition, type RuntimeMode } from "@/lib/models";
 
-type TextGenerator = (text: string, options?: Record<string, unknown>) => Promise<unknown>;
+type TextGenerator = (
+  input: string | Array<{ role: string; content: string }>,
+  options?: Record<string, unknown>,
+) => Promise<unknown>;
 
 type MetricState = {
   loadMs?: number;
@@ -36,16 +39,36 @@ function getGenerator(
         onProgress(event.status);
       }
     },
-  } as never);
+  } as never) as Promise<TextGenerator>;
 
-  const typedPromise = promise as Promise<TextGenerator>;
-  generatorCache.set(cacheKey, typedPromise);
-  void typedPromise.catch(() => generatorCache.delete(cacheKey));
-  return typedPromise;
+  generatorCache.set(cacheKey, promise);
+  void promise.catch(() => generatorCache.delete(cacheKey));
+  return promise;
+}
+
+function extractGeneratedText(result: unknown): string {
+  if (!Array.isArray(result) || result.length === 0) {
+    return String(result ?? "");
+  }
+
+  const first = result[0] as { generated_text?: unknown };
+  const generated = first?.generated_text;
+
+  if (typeof generated === "string") return generated;
+
+  if (Array.isArray(generated)) {
+    const last = generated[generated.length - 1] as { content?: unknown } | string | undefined;
+    if (typeof last === "string") return last;
+    if (last && typeof last === "object" && "content" in last) {
+      return String(last.content ?? "");
+    }
+  }
+
+  return String(generated ?? "");
 }
 
 export default function ModelLab() {
-  const model = MODELS[0];
+  const [modelId, setModelId] = useState(MODELS[0].id);
   const [runtime, setRuntime] = useState<RuntimeMode>("webgpu");
   const [prompt, setPrompt] = useState(
     "Explain what you can do in one short paragraph.",
@@ -54,6 +77,11 @@ export default function ModelLab() {
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricState>({});
+
+  const model = useMemo<ModelDefinition>(
+    () => MODELS.find((item) => item.id === modelId) ?? MODELS[0],
+    [modelId],
+  );
 
   const webGpuSupported = useMemo(
     () => typeof navigator !== "undefined" && "gpu" in navigator,
@@ -84,26 +112,24 @@ export default function ModelLab() {
       setStatus("Generating…");
 
       const generationStarted = performance.now();
-      const result = await generator(prompt, {
-        max_new_tokens: 96,
-        temperature: 0.7,
-        do_sample: true,
-        return_full_text: false,
-      } as never);
+      const result = await generator(
+        [{ role: "user", content: prompt }],
+        {
+          max_new_tokens: 96,
+          temperature: 0.7,
+          do_sample: true,
+          return_full_text: false,
+        },
+      );
 
       const generationMs = performance.now() - generationStarted;
-      const text =
-        Array.isArray(result) && result[0] && typeof result[0] === "object"
-          ? String(
-              (result[0] as { generated_text?: unknown }).generated_text ?? "",
-            )
-          : String(result ?? "");
+      const text = extractGeneratedText(result).trim();
 
-      setOutput(text.trim());
+      setOutput(text);
       setMetrics({
         loadMs: loadedMs,
         generationMs,
-        chars: text.trim().length,
+        chars: text.length,
       });
       setStatus("Complete");
     } catch (error) {
@@ -122,17 +148,41 @@ export default function ModelLab() {
       <div className="eyebrow">All-time / model lab</div>
       <h1>AI that can start tiny.</h1>
       <p className="lead">
-        Browser-first inference with a model/runtime boundary we can benchmark
-        and replace independently.
+        Browser-first inference with a fixed model revision and a swappable
+        runtime, so we can measure capability before committing to a product model.
       </p>
 
       <section className="panel">
         <div className="row">
-          <span className="badge">{model.label}</span>
+          <label className="badge">
+            Model{" "}
+            <select
+              value={modelId}
+              onChange={(event) => {
+                setModelId(event.target.value);
+                setOutput("");
+                setMetrics({});
+                setStatus("Ready");
+              }}
+              disabled={loading}
+              style={{
+                marginLeft: 8,
+                background: "transparent",
+                color: "inherit",
+                border: 0,
+              }}
+            >
+              {MODELS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <span className="badge">{model.parameters} parameters</span>
           <span className="badge">{model.dtype[runtime]}</span>
           <span className="badge">
-            ~{model.artifactMb[model.dtype[runtime]]} MB model artifact
+            ~{model.artifactMb[model.dtype[runtime]]} MB artifact
           </span>
           <span className="badge">
             WebGPU {webGpuSupported ? "available" : "not detected"}
@@ -201,8 +251,8 @@ export default function ModelLab() {
         </div>
 
         <p className="small" style={{ marginTop: 16 }}>
-          Model revision: {model.revision}. WebGPU uses q4f16; WASM uses q4.
-          The model is loaded client-side.
+          Revision: {model.revision}. WebGPU uses q4f16; WASM uses q4.
+          The model executes on the client.
         </p>
       </section>
     </main>
