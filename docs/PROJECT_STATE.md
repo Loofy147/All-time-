@@ -1,6 +1,6 @@
 # All-time — Project State
 
-Date: 2026-09-24
+Date: 2026-09-24 — consolidated audit state
 
 ## Purpose
 
@@ -22,6 +22,7 @@ All-time is currently a browser-first local AI workspace. Its purpose at this st
 
 1. Next.js serves the application shell.
 2. Transformers.js executes text generation in the browser.
+3. Verification is deliberately separated from generation; current source does not yet implement the full evidence/acceptance contract.
 3. WebGPU is used only after `navigator.gpu.requestAdapter()` succeeds.
 4. WASM/CPU is the fallback runtime.
 5. Model artifacts are fetched from fixed Hugging Face revisions.
@@ -63,6 +64,14 @@ Supabase:
 - provisioned and security-hardened
 - intentionally unused by application logic until product behavior is defined
 
+## Research source-of-truth
+
+- `docs/RESEARCH_MASTER_LEDGER_2026-09-24.md` — consolidated chronology, contradictions, and decision boundary.
+- `docs/DIRECT_INFRA_INDIRECT_GAP_AUDIT_2026-09-24.md` — current direct/infrastructure/indirect gaps.
+- `docs/CROSS_REPOSITORY_AUDIT_2026-09-24.md` — cross-repository mechanism findings.
+- `docs/INVENTORY_GUIDED_RESEARCH_2026-09-24.md` — inventory-guided mechanisms.
+- `docs/UNREGISTERED_REPOSITORY_RESEARCH_2026-09-24.md` — repositories missing from prior inventory snapshot.
+
 ## Current evidence state
 
 ### Established
@@ -73,11 +82,17 @@ Supabase:
 - Supabase security/performance advisor state
 - Hugging Face model repositories and pinned revisions/artifacts
 - one successful real browser inference reported by the owner
-- a READY Vercel deployment containing the PWA/static-icon architecture through commit `c3fbff3a0f88c385df04d29cba511ccb529e933a`
+- a READY Vercel deployment for commit `fcad119c5de292faf5a06879ffbe7791786f2eb0` (latest independently verified production reference in this audit window)
+- current Supabase project health and clean security/performance advisor state
 
 ### Open
 
-- final `main` deployment after the cleanup commits
+- reproducible dependency installation (no lockfile)
+- current CI gate (none in repository)
+- Next.js security baseline update
+- PWA waiting-worker update correctness
+- Supabase migration replay equivalence
+- evidence contract and runtime acceptance state
 - automated browser benchmark
 - controlled Android WebGPU benchmark
 - comparative model capability/quality
