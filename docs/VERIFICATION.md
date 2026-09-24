@@ -25,10 +25,10 @@ Date: 2026-09-24
 
 ### Current infrastructure constraints
 
-- `main` still references Next.js `16.3.5`; the hardening branch updates it to `16.3.6`.
+- `main` now references Next.js `16.3.6`.
 - The September 22, 2026 Next.js security release patches the critical `next/og` ImageResponse issue in `16.3.6`.
-- The hardening branch contains a generated npm lockfile and passes `npm ci`.
-- The hardening branch contains GitHub Actions for lockfile bootstrap and reproducible quality/build verification; `main` has no required status-check gate yet.
+- `main` contains the generated npm lockfile and has passed `npm ci`.
+- `main` contains GitHub Actions for reproducible quality/build verification; required status checks are not enabled on the branch.
 - Repository migration filenames do not exactly match the live Supabase migration history.
 - Browser inference is client-side; Vercel runtime error telemetry cannot represent browser-side inference failures.
 
@@ -147,14 +147,14 @@ This remains a historical deployment record and is not the current production re
 
 ### Verification infrastructure
 
-- The hardening branch now has a reproducible CI path and passed it on commit `a12b1b5eab14160fa9d77873fce41a4fb01bba70`.
+- `main` has a reproducible CI path and passed run `36056291780` on commit `3a076a8ec0ea048e121e7b29033d2cc8838a3959`.
 - No browser acceptance test suite exists yet.
 - `main` has no required status checks/branch protection; CI is not yet an enforced merge gate.
 - A build-provenance artifact is produced from source revision, Node version, and package-lock SHA-256.
 
 ### PWA
 
-- The hardening branch now targets `registration.waiting` for update activation and reloads on `controllerchange`.
+- `main` now targets `registration.waiting` for update activation and reloads on `controllerchange`.
 - Navigation responses are cached only when `response.ok` is true.
 - Installed-session update behavior remains unverified on a real Android/PWA installation.
 - Cache namespace rotation is implemented; long-term deployment churn still needs runtime verification.
@@ -179,9 +179,8 @@ No new product features should be added yet.
 
 The admissible next implementation work is limited to:
 
-1. merge the verified hardening branch;
-2. verify PWA update behavior in an installed session;
-3. add browser acceptance/failure-state tests;
-4. verify long-session resource lifecycle;
-5. reconcile Supabase migration replay equivalence.
+1. verify PWA update behavior in an installed session;
+2. add browser acceptance/failure-state tests;
+3. verify long-session resource lifecycle;
+4. reconcile Supabase migration replay equivalence.
 
