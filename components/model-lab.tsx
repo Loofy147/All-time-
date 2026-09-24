@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { pipeline } from "@huggingface/transformers";
 import { MODELS, type ModelDefinition, type RuntimeMode } from "@/lib/models";
 
@@ -104,16 +104,57 @@ export default function ModelLab() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricState>({});
   const [history, setHistory] = useState<RunRecord[]>([]);
+  const [webGpuStatus, setWebGpuStatus] = useState<
+    "checking" | "available" | "unavailable"
+  >("checking");
 
   const model = useMemo<ModelDefinition>(
     () => MODELS.find((item) => item.id === modelId) ?? MODELS[0],
     [modelId],
   );
 
-  const webGpuSupported = useMemo(
-    () => typeof navigator !== "undefined" && "gpu" in navigator,
-    [],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    async function detectWebGpu() {
+      if (typeof navigator === "undefined" || !("gpu" in navigator)) {
+        if (!cancelled) {
+          setWebGpuStatus("unavailable");
+          setRuntime("wasm");
+        }
+        return;
+      }
+
+      try {
+        const gpu = (
+          navigator as Navigator & {
+            gpu?: { requestAdapter: () => Promise<unknown | null> };
+          }
+        ).gpu;
+
+        const adapter = await gpu?.requestAdapter();
+
+        if (!cancelled) {
+          const available = Boolean(adapter);
+          setWebGpuStatus(available ? "available" : "unavailable");
+          if (!available) setRuntime("wasm");
+        }
+      } catch {
+        if (!cancelled) {
+          setWebGpuStatus("unavailable");
+          setRuntime("wasm");
+        }
+      }
+    }
+
+    void detectWebGpu();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const webGpuSupported = webGpuStatus === "available";
 
   async function run() {
     if (loading) return;
@@ -227,7 +268,12 @@ export default function ModelLab() {
             ~{model.artifactMb[model.dtype[runtime]]} MB artifact
           </span>
           <span className="badge">
-            WebGPU {webGpuSupported ? "available" : "not detected"}
+            WebGPU{" "}
+            {webGpuStatus === "checking"
+              ? "checking…"
+              : webGpuSupported
+                ? "available"
+                : "unavailable; using WASM"}
           </span>
           <span className="badge">{runtime}</span>
         </div>
