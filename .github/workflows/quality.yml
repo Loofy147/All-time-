@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   quality:
-    if: ${{ hashFiles('package-lock.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,13 +25,27 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Check lockfile
+        id: lockfile
+        shell: bash
+        run: |
+          if [[ ! -f package-lock.json ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "package-lock.json is not present yet; quality execution is deferred."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install
+        if: steps.lockfile.outputs.skip != 'true'
         run: npm ci
 
       - name: Typecheck
+        if: steps.lockfile.outputs.skip != 'true'
         run: npm run typecheck
 
       - name: Build
+        if: steps.lockfile.outputs.skip != 'true'
         run: npm run build
 
       - name: Record build provenance
@@ -60,6 +73,7 @@ jobs:
           NODE
 
       - name: Upload build provenance
+        if: steps.lockfile.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: build-provenance-${{ github.run_id }}
