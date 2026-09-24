@@ -11,17 +11,12 @@ export default function PwaRuntime() {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [persistentStorage, setPersistentStorage] = useState<boolean | null>(null);
 
   useEffect(() => {
     setInstalled(
       window.matchMedia("(display-mode: standalone)").matches ||
         Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
     );
-
-    if ("storage" in navigator && "persist" in navigator.storage) {
-      void navigator.storage.persist().then(setPersistentStorage);
-    }
 
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js").then((registration) => {
@@ -73,17 +68,10 @@ export default function PwaRuntime() {
     window.location.reload();
   }
 
-  const storageLabel =
-    persistentStorage === true
-      ? "Storage protected"
-      : persistentStorage === false
-        ? "Storage best-effort"
-        : "Storage checking";
-
   if (installed) {
     return (
       <>
-        <span className="status-pill status-ok" title={storageLabel}>
+        <span className="status-pill status-ok" title="Running as an installed app">
           Installed app
         </span>
         {updateAvailable ? (
