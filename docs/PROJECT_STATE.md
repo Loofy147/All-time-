@@ -71,6 +71,7 @@ Supabase:
 - `docs/CROSS_REPOSITORY_AUDIT_2026-09-24.md` — cross-repository mechanism findings.
 - `docs/INVENTORY_GUIDED_RESEARCH_2026-09-24.md` — inventory-guided mechanisms.
 - `docs/UNREGISTERED_REPOSITORY_RESEARCH_2026-09-24.md` — repositories missing from prior inventory snapshot.
+- `docs/DIVERSE_REPOSITORY_RESEARCH_2026-09-24.md` — CI/CD, provenance, reliability, security, privacy, and runtime research from different repository families.
 
 ## Current evidence state
 
@@ -93,6 +94,11 @@ Supabase:
 - PWA waiting-worker update correctness
 - Supabase migration replay equivalence
 - evidence contract and runtime acceptance state
+- build provenance fixture
+- machine-addressable limitations/OPEN claim registry
+- adversarial verifier tests
+- static capability vs live capability binding
+- evidence privacy classification
 - automated browser benchmark
 - controlled Android WebGPU benchmark
 - comparative model capability/quality
