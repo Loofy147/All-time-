@@ -7,10 +7,12 @@ import { MODELS, type ModelDefinition, type RuntimeMode } from "@/lib/models";
 
 type DType = "q4" | "q4f16";
 
-type TextGenerator = (
+type TextGenerator = ((
   input: string | Array<{ role: string; content: string }>,
   options?: Record<string, unknown>,
-) => Promise<unknown>;
+) => Promise<unknown>) & {
+  dispose?: () => Promise<void> | void;
+};
 
 type MetricState = {
   loadMs?: number;
@@ -22,20 +24,73 @@ type MetricState = {
 };
 
 type RunRecord = {
-  id: number;
+  schemaVersion?: 2;
+  id?: number;
+  runId?: string;
+  status?: "succeeded" | "failed";
+  startedAt?: string;
+  finishedAt?: string;
   model: string;
   revision: string;
-  runtime: RuntimeMode;
-  dtype: DType;
-  cacheHit: boolean;
-  loadMs: number;
-  generationMs: number;
-  chars: number;
+  requestedRuntime?: RuntimeMode;
+  runtime?: RuntimeMode;
+  dtype?: DType;
+  cacheHit?: boolean;
+  loadMs?: number;
+  generationMs?: number;
+  chars?: number;
+  promptChars?: number;
+  promptDigest?: string;
+  generationConfigDigest?: string;
+  outputDigest?: string;
+  webGpuStatus?: "checking" | "available" | "unavailable";
+  onlineAtStart?: boolean;
+  fallbackReason?: string;
+  error?: string;
 };
 
 const HISTORY_KEY = "all-time:measurements:v1";
 const PROMPT_KEY = "all-time:prompt:v1";
+const MAX_PROMPT_CHARS = 4000;
+const MAX_HISTORY = 8;
+const GENERATION_CONFIG = {
+  max_new_tokens: 96,
+  do_sample: false,
+  return_full_text: false,
+} as const;
 const generatorCache = new Map<string, Promise<TextGenerator>>();
+
+function createRunId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `run-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function sha256(value: string): Promise<string | undefined> {
+  try {
+    if (!("crypto" in globalThis) || !crypto.subtle) return undefined;
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(value),
+    );
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return undefined;
+  }
+}
+
+function releaseCachedGeneratorsExcept(keepKey?: string) {
+  for (const [key, promise] of generatorCache.entries()) {
+    if (key === keepKey) continue;
+    generatorCache.delete(key);
+    void promise
+      .then((generator) => generator.dispose?.())
+      .catch(() => undefined);
+  }
+}
 
 function getCacheKey(
   modelId: string,
@@ -211,6 +266,18 @@ export default function ModelLab() {
   async function run() {
     if (loading || !prompt.trim()) return;
 
+    if (prompt.length > MAX_PROMPT_CHARS) {
+      setOutput("");
+      setError(`Prompt exceeds the local safety limit of ${MAX_PROMPT_CHARS} characters.`);
+      setStatus("Rejected");
+      return;
+    }
+
+    const runId = createRunId();
+    const startedAt = new Date().toISOString();
+    const promptDigestPromise = sha256(prompt);
+    const generationConfigDigestPromise = sha256(JSON.stringify(GENERATION_CONFIG));
+
     setLoading(true);
     setOutput("");
     setError("");
@@ -241,6 +308,8 @@ export default function ModelLab() {
 
         actualRuntime = "wasm";
         actualDtype = model.dtype.wasm;
+        fallbackReason =
+          firstError instanceof Error ? firstError.message : String(firstError);
         cacheHit = generatorCache.has(
           getCacheKey(model.id, model.revision, actualRuntime, actualDtype),
         );
@@ -255,29 +324,57 @@ export default function ModelLab() {
         );
       }
 
-      const loadedMs = performance.now() - started;
+      loadedMs = performance.now() - started;
       setStatus("Generating…");
 
       const generationStarted = performance.now();
       const result = await generator(
         [{ role: "user", content: prompt }],
-        {
-          max_new_tokens: 96,
-          do_sample: false,
-          return_full_text: false,
-        },
+        GENERATION_CONFIG,
       );
 
-      const generationMs = performance.now() - generationStarted;
+      generationMs = performance.now() - generationStarted;
       const text = extractGeneratedText(result).trim();
 
       if (!text) {
         throw new Error("The model completed without returning text.");
       }
 
+      const [promptDigest, generationConfigDigest, outputDigest] =
+        await Promise.all([
+          promptDigestPromise,
+          generationConfigDigestPromise,
+          sha256(text),
+        ]);
+      const finishedAt = new Date().toISOString();
+      const runRecord: RunRecord = {
+        schemaVersion: 2,
+        id: Date.now(),
+        runId,
+        status: "succeeded",
+        startedAt,
+        finishedAt,
+        model: model.label,
+        revision: model.revision,
+        requestedRuntime,
+        runtime: actualRuntime,
+        dtype: actualDtype,
+        cacheHit,
+        loadMs,
+        generationMs,
+        chars: text.length,
+        promptChars: prompt.length,
+        promptDigest,
+        generationConfigDigest,
+        outputDigest,
+        webGpuStatus,
+        onlineAtStart: online,
+        fallbackReason,
+      };
+
       setOutput(text);
       setMetrics({
-        loadMs: loadedMs,
+        loadMs,
         generationMs,
         chars: text.length,
         cacheHit,
@@ -285,20 +382,10 @@ export default function ModelLab() {
         dtype: actualDtype,
       });
 
-      setHistory((current) => [
-        {
-          id: Date.now(),
-          model: model.label,
-          revision: model.revision,
-          runtime: actualRuntime,
-          dtype: actualDtype,
-          cacheHit,
-          loadMs: loadedMs,
-          generationMs,
-          chars: text.length,
-        },
-        ...current,
-      ].slice(0, 8));
+      setHistory((current) => [runRecord, ...current].slice(0, MAX_HISTORY));
+      releaseCachedGeneratorsExcept(
+        getCacheKey(model.id, model.revision, actualRuntime, actualDtype),
+      );
 
       setStatus("Complete");
     } catch (runError) {
@@ -307,8 +394,38 @@ export default function ModelLab() {
         runError instanceof Error
           ? runError.message
           : "Unknown runtime error.";
+      const [promptDigest, generationConfigDigest] = await Promise.all([
+        promptDigestPromise,
+        generationConfigDigestPromise,
+      ]);
+      const runRecord: RunRecord = {
+        schemaVersion: 2,
+        id: Date.now(),
+        runId,
+        status: "failed",
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        model: model.label,
+        revision: model.revision,
+        requestedRuntime,
+        runtime: actualRuntime,
+        dtype: actualDtype,
+        cacheHit,
+        loadMs,
+        generationMs,
+        promptChars: prompt.length,
+        promptDigest,
+        generationConfigDigest,
+        webGpuStatus,
+        onlineAtStart: online,
+        fallbackReason,
+        error: message,
+      };
+
       setError(message);
       setStatus("Failed");
+      setHistory((current) => [runRecord, ...current].slice(0, MAX_HISTORY));
+      releaseCachedGeneratorsExcept();
     } finally {
       setLoading(false);
     }
@@ -392,6 +509,7 @@ export default function ModelLab() {
               value={modelId}
               onChange={(event) => {
                 setModelId(event.target.value);
+                releaseCachedGeneratorsExcept();
                 setOutput("");
                 setError("");
                 setMetrics({});
@@ -412,14 +530,20 @@ export default function ModelLab() {
             <div className="segmented">
               <button
                 className={runtime === "webgpu" ? "segment active" : "segment"}
-                onClick={() => setRuntime("webgpu")}
+                onClick={() => {
+                  releaseCachedGeneratorsExcept();
+                  setRuntime("webgpu");
+                }}
                 disabled={!webGpuSupported || loading}
               >
                 WebGPU
               </button>
               <button
                 className={runtime === "wasm" ? "segment active" : "segment"}
-                onClick={() => setRuntime("wasm")}
+                onClick={() => {
+                  releaseCachedGeneratorsExcept();
+                  setRuntime("wasm");
+                }}
                 disabled={loading}
               >
                 WASM
@@ -438,9 +562,11 @@ export default function ModelLab() {
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           disabled={loading}
+          maxLength={MAX_PROMPT_CHARS}
           aria-label="Prompt"
           placeholder="Ask the local model something…"
         />
+        <div className="small">{prompt.length}/{MAX_PROMPT_CHARS} prompt characters</div>
 
         <div className="action-row">
           <button
@@ -535,13 +661,13 @@ export default function ModelLab() {
                 <div>
                   <strong>{item.model}</strong>
                   <div className="small">
-                    {item.runtime} · {item.dtype} · {item.cacheHit ? "warm" : "cold"}
+                    {item.status ?? "legacy"} · {item.runtime ?? "—"} · {item.dtype ?? "—"} · {item.cacheHit ? "warm" : "cold"}
                   </div>
                 </div>
                 <div className="history-metrics">
-                  <span>{Math.round(item.loadMs)} ms load</span>
-                  <span>{Math.round(item.generationMs)} ms gen</span>
-                  <span>{item.chars} chars</span>
+                  <span>{item.loadMs === undefined ? "—" : `${Math.round(item.loadMs)} ms load`}</span>
+                  <span>{item.generationMs === undefined ? "—" : `${Math.round(item.generationMs)} ms gen`}</span>
+                  <span>{item.chars === undefined ? "—" : `${item.chars} chars`}</span>
                 </div>
               </article>
             ))}
@@ -549,8 +675,10 @@ export default function ModelLab() {
         )}
 
         <p className="small footer-note">
-          Revision: {model.revision}. Transformers.js uses the browser Cache API
-          for model files when available; the app shell itself is handled by the
+          Revision: {model.revision}. Run records now include run identity,
+          input/output digests when SHA-256 is available, requested/actual runtime,
+          fallback cause, and failure state. Transformers.js uses the browser Cache
+          API for model files when available; the app shell itself is handled by the
           lightweight service worker.
         </p>
       </section>
