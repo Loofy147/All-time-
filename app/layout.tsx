@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import PwaRuntime from "@/components/pwa-runtime";
 
 export const metadata: Metadata = {
   title: "All-time — Local AI",
@@ -27,10 +26,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>
-        <PwaRuntime />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
