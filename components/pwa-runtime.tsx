@@ -18,8 +18,9 @@ export default function PwaRuntime() {
         Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
     );
 
+    const onControllerChange = () => window.location.reload();
+
     if ("serviceWorker" in navigator) {
-      const onControllerChange = () => window.location.reload();
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
       void navigator.serviceWorker.register("/sw.js").then((registration) => {
