@@ -13,9 +13,30 @@ type MetricState = {
   loadMs?: number;
   generationMs?: number;
   chars?: number;
+  cacheHit?: boolean;
+};
+
+type RunRecord = {
+  id: number;
+  model: string;
+  runtime: RuntimeMode;
+  dtype: "q4" | "q4f16";
+  cacheHit: boolean;
+  loadMs: number;
+  generationMs: number;
+  chars: number;
 };
 
 const generatorCache = new Map<string, Promise<TextGenerator>>();
+
+function getCacheKey(
+  modelId: string,
+  revision: string,
+  runtime: RuntimeMode,
+  dtype: "q4" | "q4f16",
+) {
+  return `${modelId}@${revision}:${runtime}:${dtype}`;
+}
 
 function getGenerator(
   modelId: string,
@@ -24,7 +45,7 @@ function getGenerator(
   dtype: "q4" | "q4f16",
   onProgress: (status: string) => void,
 ) {
-  const cacheKey = `${modelId}@${revision}:${runtime}:${dtype}`;
+  const cacheKey = getCacheKey(modelId, revision, runtime, dtype);
   const cached = generatorCache.get(cacheKey);
   if (cached) return cached;
 
@@ -57,8 +78,13 @@ function extractGeneratedText(result: unknown): string {
   if (typeof generated === "string") return generated;
 
   if (Array.isArray(generated)) {
-    const last = generated[generated.length - 1] as { content?: unknown } | string | undefined;
+    const last = generated[generated.length - 1] as
+      | { content?: unknown }
+      | string
+      | undefined;
+
     if (typeof last === "string") return last;
+
     if (last && typeof last === "object" && "content" in last) {
       return String(last.content ?? "");
     }
@@ -77,6 +103,7 @@ export default function ModelLab() {
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricState>({});
+  const [history, setHistory] = useState<RunRecord[]>([]);
 
   const model = useMemo<ModelDefinition>(
     () => MODELS.find((item) => item.id === modelId) ?? MODELS[0],
@@ -96,10 +123,12 @@ export default function ModelLab() {
     setMetrics({});
     setStatus("Preparing model…");
 
+    const dtype = model.dtype[runtime];
+    const cacheKey = getCacheKey(model.id, model.revision, runtime, dtype);
+    const cacheHit = generatorCache.has(cacheKey);
     const started = performance.now();
 
     try {
-      const dtype = model.dtype[runtime];
       const generator = await getGenerator(
         model.id,
         model.revision,
@@ -116,8 +145,7 @@ export default function ModelLab() {
         [{ role: "user", content: prompt }],
         {
           max_new_tokens: 96,
-          temperature: 0.7,
-          do_sample: true,
+          do_sample: false,
           return_full_text: false,
         },
       );
@@ -130,7 +158,21 @@ export default function ModelLab() {
         loadMs: loadedMs,
         generationMs,
         chars: text.length,
+        cacheHit,
       });
+      setHistory((current) => [
+        {
+          id: Date.now(),
+          model: model.label,
+          runtime,
+          dtype,
+          cacheHit,
+          loadMs: loadedMs,
+          generationMs,
+          chars: text.length,
+        },
+        ...current,
+      ].slice(0, 8));
       setStatus("Complete");
     } catch (error) {
       console.error(error);
@@ -222,6 +264,12 @@ export default function ModelLab() {
           >
             {loading ? "Running…" : "Run locally"}
           </button>
+          <button
+            onClick={() => setHistory([])}
+            disabled={loading || history.length === 0}
+          >
+            Clear measurements
+          </button>
           <span className="small">{status}</span>
         </div>
 
@@ -233,13 +281,25 @@ export default function ModelLab() {
           <div className="metric">
             <span className="small">Model/runtime load</span>
             <strong>
-              {metrics.loadMs ? `${Math.round(metrics.loadMs)} ms` : "—"}
+              {metrics.loadMs !== undefined
+                ? `${Math.round(metrics.loadMs)} ms`
+                : "—"}
+            </strong>
+          </div>
+          <div className="metric">
+            <span className="small">Cache</span>
+            <strong>
+              {metrics.cacheHit === undefined
+                ? "—"
+                : metrics.cacheHit
+                  ? "warm"
+                  : "cold"}
             </strong>
           </div>
           <div className="metric">
             <span className="small">Generation</span>
             <strong>
-              {metrics.generationMs
+              {metrics.generationMs !== undefined
                 ? `${Math.round(metrics.generationMs)} ms`
                 : "—"}
             </strong>
@@ -250,8 +310,33 @@ export default function ModelLab() {
           </div>
         </div>
 
+        <div style={{ marginTop: 18 }}>
+          <div className="small">Session measurements (latest 8)</div>
+          {history.length === 0 ? (
+            <div className="small" style={{ marginTop: 8 }}>
+              Run the same model/runtime twice to compare cold vs warm load.
+            </div>
+          ) : (
+            <div className="meta" style={{ marginTop: 8 }}>
+              {history.map((item) => (
+                <div className="metric" key={item.id}>
+                  <span className="small">
+                    {item.model} · {item.runtime} · {item.dtype}
+                  </span>
+                  <strong>{item.cacheHit ? "warm" : "cold"}</strong>
+                  <span className="small">
+                    load {Math.round(item.loadMs)} ms · gen{" "}
+                    {Math.round(item.generationMs)} ms · {item.chars} chars
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <p className="small" style={{ marginTop: 16 }}>
           Revision: {model.revision}. WebGPU uses q4f16; WASM uses q4.
+          Benchmark runs use deterministic decoding (do_sample=false).
           The model executes on the client.
         </p>
       </section>
