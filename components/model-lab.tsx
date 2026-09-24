@@ -291,7 +291,7 @@ export default function ModelLab() {
       getCacheKey(model.id, model.revision, requestedRuntime, actualDtype),
     );
     const started = performance.now();
-    let loadedMs: number | undefined;
+    let loadMs: number | undefined;
     let generationMs: number | undefined;
     let fallbackReason: string | undefined;
 
@@ -327,7 +327,7 @@ export default function ModelLab() {
         );
       }
 
-      loadedMs = performance.now() - started;
+      loadMs = performance.now() - started;
       setStatus("Generating…");
 
       const generationStarted = performance.now();
