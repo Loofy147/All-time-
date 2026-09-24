@@ -23,10 +23,10 @@ All-time is currently a browser-first local AI workspace. Its purpose at this st
 1. Next.js serves the application shell.
 2. Transformers.js executes text generation in the browser.
 3. Verification is deliberately separated from generation; current source does not yet implement the full evidence/acceptance contract.
-3. WebGPU is used only after `navigator.gpu.requestAdapter()` succeeds.
+4. WebGPU is used only after `navigator.gpu.requestAdapter()` succeeds.
 4. WASM/CPU is the fallback runtime.
 5. Model artifacts are fetched from fixed Hugging Face revisions.
-6. Transformers.js/browser caching handles model artifacts; the service worker caches only the lightweight application shell.
+7. Transformers.js/browser caching handles model artifacts; the service worker caches only the lightweight application shell.
 8. Supabase is provisioned but has no application schema yet.
 
 ## Model candidates
