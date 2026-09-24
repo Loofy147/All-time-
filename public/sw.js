@@ -1,5 +1,5 @@
 const CACHE_NAME = "all-time-shell-v1";
-const APP_SHELL = ["/", "/offline", "/manifest.webmanifest", "/icon-192", "/icon-512"];
+const APP_SHELL = ["/", "/offline", "/manifest.webmanifest", "/icon-192.svg", "/icon-512.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
