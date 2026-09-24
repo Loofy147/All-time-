@@ -283,3 +283,43 @@ Resolution:
 No product feature expansion is justified until P0–P2 have been implemented or explicitly falsified by evidence.
 
 No backend persistence is justified until the local evidence model proves what must be persisted and why.
+
+
+### Round 5 — Diverse infrastructure/reliability/security review
+
+Primary record:
+
+`docs/DIVERSE_REPOSITORY_RESEARCH_2026-09-24.md`
+
+New repository families examined:
+
+- Workflows--ci-cd
+- CloudCostGuard
+- meta-secure-framework
+- Discovery-engine-
+- device-activity-tracker
+- Leak-detecteur
+- TML-Virtual-Machine
+- Residual-Opportunity-Scanner
+
+New mechanisms retained:
+
+- build provenance;
+- executable objective quality gates;
+- multi-layer testing and operational runbooks;
+- explicit limitations/known-blind-spots registry;
+- adversarial verifier testing;
+- static capability vs live capability separation;
+- privacy-aware telemetry classification;
+- explicit concurrency contracts for persistent state.
+
+New open gaps:
+
+- G9 build provenance fixture;
+- G10 machine-addressable limitations/OPEN registry;
+- G11 adversarial acceptance tests;
+- G12 formal binding between static model capability and live runtime resolution;
+- G13 evidence privacy classification;
+- G14 explicit concurrency/attempt semantics for any future persistent state.
+
+These mechanisms do not justify backend activation or whole-system import.
