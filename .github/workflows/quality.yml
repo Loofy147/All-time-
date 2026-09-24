@@ -1,0 +1,79 @@
+name: Quality
+
+on:
+  push:
+    branches:
+      - main
+      - "hardening/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check lockfile
+        id: lockfile
+        shell: bash
+        run: |
+          if [[ ! -f package-lock.json ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "package-lock.json is not present yet; quality execution is deferred."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install
+        if: steps.lockfile.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Typecheck
+        if: steps.lockfile.outputs.skip != 'true'
+        run: npm run typecheck
+
+      - name: Build
+        if: steps.lockfile.outputs.skip != 'true'
+        run: npm run build
+
+      - name: Record build provenance
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+
+          const lock = fs.readFileSync("package-lock.json");
+          const provenance = {
+            schemaVersion: 1,
+            repository: "Loofy147/All-time-",
+            sourceRevision: process.env.SOURCE_REVISION,
+            ref: process.env.REF_NAME,
+            workflowRunId: process.env.WORKFLOW_RUN_ID,
+            node: process.version,
+            packageLockSha256: crypto.createHash("sha256").update(lock).digest("hex"),
+          };
+
+          fs.writeFileSync("build-provenance.json", JSON.stringify(provenance, null, 2) + "\n");
+          NODE
+
+      - name: Upload build provenance
+        if: steps.lockfile.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-provenance-${{ github.run_id }}
+          path: build-provenance.json

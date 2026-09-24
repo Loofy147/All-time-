@@ -25,14 +25,21 @@ Date: 2026-09-24
 
 ### Current infrastructure constraints
 
-- Current source pins Next.js `16.3.5`.
-- The official Next.js security update of September 22, 2026 states that 16.3.x users should upgrade to `16.3.6` for a critical out-of-band security issue.
-- Repository has no package lockfile.
-- Repository currently has no GitHub Actions workflow.
+- `main` still references Next.js `16.3.5`; the hardening branch updates it to `16.3.6`.
+- The September 22, 2026 Next.js security release patches the critical `next/og` ImageResponse issue in `16.3.6`.
+- The hardening branch contains a generated npm lockfile and passes `npm ci`.
+- The hardening branch contains GitHub Actions for lockfile bootstrap and reproducible quality/build verification; `main` has no required status-check gate yet.
 - Repository migration filenames do not exactly match the live Supabase migration history.
 - Browser inference is client-side; Vercel runtime error telemetry cannot represent browser-side inference failures.
 
 ### Experimentally supported
+
+A hardening-branch GitHub Actions run on commit `a12b1b5eab14160fa9d77873fce41a4fb01bba70` completed successfully with:
+
+- `npm ci`
+- `npm run typecheck`
+- `npm run build`
+- build-provenance generation and artifact upload
 
 A user-run browser test on the deployed application produced:
 
@@ -42,16 +49,22 @@ A user-run browser test on the deployed application produced:
 
 This supports end-to-end browser execution on that tested environment only. It does not establish general compatibility, performance, or model quality.
 
-The application also records successful-run measurements for:
+The hardening branch now records, per run:
 
+- logical run ID
 - model and pinned revision
-- runtime and dtype
-- cold/warm cache state
-- load time
-- generation time
-- output size
+- requested and actual runtime
+- dtype
+- in-memory pipeline cache state
+- load and generation timing
+- prompt length
+- SHA-256 digests for prompt, generation configuration, and output when browser crypto is available
+- WebGPU preflight state
+- online state at run start
+- fallback cause
+- explicit success/failure status and error text for failed runs
 
-The current `cacheHit` field is implementation-specific and should not yet be interpreted as definitive browser model-cache state.
+The existing `cacheHit` field remains implementation-specific and is not evidence of browser artifact-cache residency.
 
 ### Corrected
 
@@ -120,11 +133,10 @@ This remains a historical deployment record and is not the current production re
 
 ### Evidence
 
-- No logical run identity exists yet.
-- No output digest exists in successful-run records.
-- WebGPU failure followed by WASM fallback does not preserve the original failure in the measurement record.
-- No deterministic acceptance state exists.
-- Runtime preflight and actual runtime resolution are not persisted as claim-grade evidence.
+- No deterministic acceptance state exists yet.
+- App/build revision is not yet embedded into every browser run record.
+- Runtime resource lifecycle has implementation coverage but still needs long-session/device verification.
+- Failure taxonomy remains coarse; a structured error-class contract is not yet implemented.
 
 ### Product
 
@@ -135,16 +147,17 @@ This remains a historical deployment record and is not the current production re
 
 ### Verification infrastructure
 
-- No current repository CI gate exists.
-- No browser acceptance test suite exists.
-- Vercel build success is currently the strongest automated deployment gate.
-- No reproducible package install is established because no dependency lockfile is committed.
+- The hardening branch now has a reproducible CI path and passed it on commit `a12b1b5eab14160fa9d77873fce41a4fb01bba70`.
+- No browser acceptance test suite exists yet.
+- `main` has no required status checks/branch protection; CI is not yet an enforced merge gate.
+- A build-provenance artifact is produced from source revision, Node version, and package-lock SHA-256.
 
 ### PWA
 
-- The Update button currently targets the active service-worker controller rather than explicitly messaging the waiting worker; real installed-session verification remains OPEN.
-- Navigation cache currently does not gate caching on `response.ok`.
-- Service-worker cache retention is not explicitly garbage-collected across many deployments.
+- The hardening branch now targets `registration.waiting` for update activation and reloads on `controllerchange`.
+- Navigation responses are cached only when `response.ok` is true.
+- Installed-session update behavior remains unverified on a real Android/PWA installation.
+- Cache namespace rotation is implemented; long-term deployment churn still needs runtime verification.
 
 ### Database
 
@@ -166,9 +179,9 @@ No new product features should be added yet.
 
 The admissible next implementation work is limited to:
 
-1. dependency/security baseline correction;
-2. reproducible dependency installation;
-3. PWA correctness fixes;
-4. local evidence-contract experiment;
-5. browser acceptance and resource-lifecycle verification.
+1. merge the verified hardening branch;
+2. verify PWA update behavior in an installed session;
+3. add browser acceptance/failure-state tests;
+4. verify long-session resource lifecycle;
+5. reconcile Supabase migration replay equivalence.
 

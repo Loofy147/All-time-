@@ -27,7 +27,7 @@ All-time is currently a browser-first local AI workspace. Its purpose at this st
 4. WASM/CPU is the fallback runtime.
 5. Model artifacts are fetched from fixed Hugging Face revisions.
 6. Transformers.js/browser caching handles model artifacts; the service worker caches only the lightweight application shell.
-7. Supabase is provisioned but has no application schema yet.
+8. Supabase is provisioned but has no application schema yet.
 
 ## Model candidates
 
@@ -75,6 +75,28 @@ Supabase:
 
 ## Current evidence state
 
+### Hardening branch verification
+
+The branch `hardening/p0-runtime-evidence` contains the P0/P1/P2 baseline changes and passed GitHub Actions Quality run `36056005521` on commit `a12b1b5eab14160fa9d77873fce41a4fb01bba70`.
+
+Verified in that run:
+
+- npm lockfile present and consumed by `npm ci`
+- `npm run typecheck` passed
+- `npm run build` passed
+- build provenance artifact generated and uploaded
+
+Implemented source changes on the branch:
+
+- Next.js `16.3.6`
+- PWA waiting-worker activation fix
+- navigation-cache `response.ok` guard
+- service-worker cache namespace bump
+- runtime pipeline disposal on switch/failure with current pipeline residency retained
+- prompt safety limit
+- run-level evidence identity/digests/fallback/failure recording
+- CI quality/provenance workflow
+
 ### Established
 
 - GitHub repository and main branch
@@ -88,13 +110,13 @@ Supabase:
 
 ### Open
 
-- reproducible dependency installation (no lockfile)
-- current CI gate (none in repository)
-- Next.js security baseline update
-- PWA waiting-worker update correctness
+- hardening branch changes are not merged to `main` yet
+- no enforced branch protection/status-check gate
+- PWA update behavior is not verified on a real installed Android session
+- deterministic acceptance state is not implemented yet
+- app/build revision is not present in browser run records
+- structured failure taxonomy is not implemented
 - Supabase migration replay equivalence
-- evidence contract and runtime acceptance state
-- build provenance fixture
 - machine-addressable limitations/OPEN claim registry
 - adversarial verifier tests
 - static capability vs live capability binding
