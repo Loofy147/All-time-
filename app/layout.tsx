@@ -1,9 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import PwaRuntime from "@/components/pwa-runtime";
 
 export const metadata: Metadata = {
-  title: "All-time — Local Model Lab",
-  description: "Browser-first experiments with compact open models.",
+  title: "All-time — Local AI",
+  description:
+    "A browser-first local AI workspace for compact open models.",
+  applicationName: "All-time",
+  appleWebApp: {
+    capable: true,
+    title: "All-time",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b1420",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -11,7 +27,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PwaRuntime />
+        {children}
+      </body>
     </html>
   );
 }
