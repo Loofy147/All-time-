@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MODELS } from "@/lib/models";
+import { pipeline } from "@huggingface/transformers";
+import { MODELS, type RuntimeMode } from "@/lib/models";
 
-type RuntimeMode = "webgpu" | "wasm";
+type TextGenerator = Awaited<ReturnType<typeof pipeline<"text-generation">>>;
 
 type MetricState = {
   loadMs?: number;
@@ -11,10 +12,42 @@ type MetricState = {
   chars?: number;
 };
 
+const generatorCache = new Map<string, Promise<TextGenerator>>();
+
+function getGenerator(
+  modelId: string,
+  revision: string,
+  runtime: RuntimeMode,
+  dtype: "q4" | "q4f16",
+  onProgress: (status: string) => void,
+) {
+  const cacheKey = `${modelId}@${revision}:${runtime}:${dtype}`;
+  const cached = generatorCache.get(cacheKey);
+  if (cached) return cached;
+
+  const promise = pipeline("text-generation", modelId, {
+    revision,
+    device: runtime,
+    dtype,
+    progress_callback: (event: { status?: string; progress?: number }) => {
+      if (event.status === "progress_total" && typeof event.progress === "number") {
+        onProgress(`Loading model… ${Math.round(event.progress)}%`);
+      } else if (event.status) {
+        onProgress(event.status);
+      }
+    },
+  } as never);
+
+  generatorCache.set(cacheKey, promise);
+  return promise;
+}
+
 export default function ModelLab() {
   const model = MODELS[0];
   const [runtime, setRuntime] = useState<RuntimeMode>("webgpu");
-  const [prompt, setPrompt] = useState("Explain what you can do in one short paragraph.");
+  const [prompt, setPrompt] = useState(
+    "Explain what you can do in one short paragraph.",
+  );
   const [output, setOutput] = useState("");
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
@@ -31,24 +64,19 @@ export default function ModelLab() {
     setLoading(true);
     setOutput("");
     setMetrics({});
-    setStatus("Loading model…");
+    setStatus("Preparing model…");
 
     const started = performance.now();
 
     try {
-      const { pipeline } = await import("@huggingface/transformers");
-
-      const generator = await pipeline("text-generation", model.id, {
-        device: runtime,
-        dtype: model.dtype,
-        progress_callback: (event: { status?: string; progress?: number }) => {
-          if (event.status === "progress_total" && typeof event.progress === "number") {
-            setStatus(`Loading model… ${Math.round(event.progress)}%`);
-          } else if (event.status) {
-            setStatus(event.status);
-          }
-        },
-      } as never);
+      const dtype = model.dtype[runtime];
+      const generator = await getGenerator(
+        model.id,
+        model.revision,
+        runtime,
+        dtype,
+        setStatus,
+      );
 
       const loadedMs = performance.now() - started;
       setStatus("Generating…");
@@ -64,7 +92,9 @@ export default function ModelLab() {
       const generationMs = performance.now() - generationStarted;
       const text =
         Array.isArray(result) && result[0] && typeof result[0] === "object"
-          ? String((result[0] as { generated_text?: unknown }).generated_text ?? "")
+          ? String(
+              (result[0] as { generated_text?: unknown }).generated_text ?? "",
+            )
           : String(result ?? "");
 
       setOutput(text.trim());
@@ -90,15 +120,18 @@ export default function ModelLab() {
       <div className="eyebrow">All-time / model lab</div>
       <h1>AI that can start tiny.</h1>
       <p className="lead">
-        A browser-first laboratory for testing how far a very small open model
-        can go before a server-side model becomes necessary.
+        Browser-first inference with a model/runtime boundary we can benchmark
+        and replace independently.
       </p>
 
       <section className="panel">
         <div className="row">
           <span className="badge">{model.label}</span>
           <span className="badge">{model.parameters} parameters</span>
-          <span className="badge">{model.dtype}</span>
+          <span className="badge">{model.dtype[runtime]}</span>
+          <span className="badge">
+            ~{model.artifactMb[model.dtype[runtime]]} MB model artifact
+          </span>
           <span className="badge">
             WebGPU {webGpuSupported ? "available" : "not detected"}
           </span>
@@ -130,22 +163,34 @@ export default function ModelLab() {
         />
 
         <div className="row" style={{ marginTop: 12 }}>
-          <button className="primary" onClick={run} disabled={loading || !prompt.trim()}>
+          <button
+            className="primary"
+            onClick={run}
+            disabled={loading || !prompt.trim()}
+          >
             {loading ? "Running…" : "Run locally"}
           </button>
           <span className="small">{status}</span>
         </div>
 
-        <div className="output">{output || "Model output will appear here."}</div>
+        <div className="output">
+          {output || "Model output will appear here."}
+        </div>
 
         <div className="meta">
           <div className="metric">
-            <span className="small">Model load</span>
-            <strong>{metrics.loadMs ? `${Math.round(metrics.loadMs)} ms` : "—"}</strong>
+            <span className="small">Model/runtime load</span>
+            <strong>
+              {metrics.loadMs ? `${Math.round(metrics.loadMs)} ms` : "—"}
+            </strong>
           </div>
           <div className="metric">
             <span className="small">Generation</span>
-            <strong>{metrics.generationMs ? `${Math.round(metrics.generationMs)} ms` : "—"}</strong>
+            <strong>
+              {metrics.generationMs
+                ? `${Math.round(metrics.generationMs)} ms`
+                : "—"}
+            </strong>
           </div>
           <div className="metric">
             <span className="small">Output</span>
@@ -154,8 +199,8 @@ export default function ModelLab() {
         </div>
 
         <p className="small" style={{ marginTop: 16 }}>
-          The model runs in the user&apos;s browser. The initial experiment uses
-          Hugging Face&apos;s ONNX Community SmolLM2 135M Instruct model.
+          Model revision: {model.revision}. WebGPU uses q4f16; WASM uses q4.
+          The model is loaded client-side.
         </p>
       </section>
     </main>
